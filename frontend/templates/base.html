@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151f">
+  <title>{{ title }} · UNIWORK</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{{ url_for('dashboard') }}">
+      <span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 8.5 16 3l10 5.5v15L16 29 6 23.5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m6 8.5 10 6 10-6M16 14.5V29" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="14.5" r="2.2" fill="currentColor"/></svg></span>
+      <span><strong>UNIWORK</strong><small>OPERATIONS OS · INDIA</small></span>
+    </a>
+    <div class="workspace"><span class="workspace-dot"></span><span><b>Northstar Components</b><small>Manufacturing workspace</small></span><span class="chevron">⌄</span></div>
+    <div class="nav-label">WORKSPACE</div>
+    <nav class="nav">
+      <a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}"><span class="nav-icon">◫</span> Overview</a>
+      {% if current_user.role in ['admin','procurement','viewer'] %}<a class="{{ 'active' if request.endpoint == 'purchase_orders' else '' }}" href="{{ url_for('purchase_orders') }}"><span class="nav-icon">↗</span> Procurement <span class="nav-count">PO</span></a>{% endif %}
+      {% if can_access('receipts') %}<a class="{{ 'active' if request.endpoint == 'receipts' else '' }}" href="{{ url_for('receipts') }}"><span class="nav-icon">⇩</span> Goods receipts</a>{% endif %}
+      {% if can_access('inventory') %}<a class="{{ 'active' if request.endpoint == 'inventory' else '' }}" href="{{ url_for('inventory') }}"><span class="nav-icon">▦</span> Inventory</a>{% endif %}
+      {% if can_access('consumption') %}<a class="{{ 'active' if request.endpoint == 'consumption' else '' }}" href="{{ url_for('consumption') }}"><span class="nav-icon">−</span> Material issue</a>{% endif %}
+      {% if can_access('transfers') %}<a class="{{ 'active' if request.endpoint == 'transfers' else '' }}" href="{{ url_for('transfers') }}"><span class="nav-icon">⇄</span> Warehouse transfers</a>{% endif %}
+      {% if can_access('vendors') %}<a class="{{ 'active' if request.endpoint == 'vendors' else '' }}" href="{{ url_for('vendors') }}"><span class="nav-icon">♧</span> Vendors</a>{% endif %}
+      {% if can_access('invoices') %}<a class="{{ 'active' if request.endpoint == 'invoices' else '' }}" href="{{ url_for('invoices') }}"><span class="nav-icon">▤</span> Vendor invoices</a>{% endif %}
+      {% if can_access('matching') %}<a class="{{ 'active' if request.endpoint == 'matching' else '' }}" href="{{ url_for('matching') }}"><span class="nav-icon">⇄</span> Three-way matching</a>{% endif %}
+      {% if can_access('gst_center') %}<a class="{{ 'active' if request.endpoint == 'gst_center' else '' }}" href="{{ url_for('gst_center') }}"><span class="nav-icon">₹</span> GST & ITC</a>{% endif %}
+    </nav>
+    <div class="nav-label nav-label-spaced">INSIGHTS</div>
+    <nav class="nav">
+      {% if can_access('reports') %}<a class="{{ 'active' if request.endpoint == 'reports' else '' }}" href="{{ url_for('reports') }}"><span class="nav-icon">⌁</span> Reports & exports</a>{% endif %}
+      {% if can_access('payables') %}<a class="{{ 'active' if request.endpoint == 'payables' else '' }}" href="{{ url_for('payables') }}"><span class="nav-icon">₹</span> Accounts payable</a>{% endif %}
+      {% if can_access('receivables') %}<a class="{{ 'active' if request.endpoint == 'receivables' else '' }}" href="{{ url_for('receivables') }}"><span class="nav-icon">↗</span> Accounts receivable</a>{% endif %}
+      {% if is_admin %}<a class="{{ 'active' if request.endpoint in ['audit_page','audit_integrity'] else '' }}" href="{{ url_for('audit_page') }}"><span class="nav-icon">◷</span> Audit trail</a><a class="{{ 'active' if request.endpoint == 'user_management' else '' }}" href="{{ url_for('user_management') }}"><span class="nav-icon">♙</span> Users & roles</a><a class="{{ 'active' if request.endpoint == 'data_management' else '' }}" href="{{ url_for('data_management') }}"><span class="nav-icon">⌫</span> Data management</a>{% endif %}
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="help-card"><div class="help-icon">✳</div><b>Built for the shop floor.</b><p>One clear view from purchase order to GST-ready books.</p>{% if can_access('reports') %}<a href="{{ url_for('reports') }}">Explore reports <span>↗</span></a>{% elif can_access('inventory') %}<a href="{{ url_for('inventory') }}">Explore inventory <span>↗</span></a>{% else %}<a href="{{ url_for('profile') }}">Open profile <span>↗</span></a>{% endif %}</div>
+      <div class="user-profile"><div class="avatar">{{ current_user.full_name[:2]|upper }}</div><span class="profile-name"><b>{{ current_user.full_name }}</b><small>{{ role_labels[current_user.role] }} · <a href="{{ url_for('change_password') }}">Password</a></small></span><form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token_value }}"><button class="logout-btn" type="submit" title="Sign out">↪</button></form></div>
+    </div>
+  </aside>
+  <main class="main-area">
+    <header class="topbar">
+      <button class="mobile-menu" id="menuToggle" aria-label="Toggle navigation">☰</button>
+      <div class="breadcrumbs"><span>Northstar Components</span><i>/</i><b>{{ title }}</b></div>
+      <div class="top-actions"><span class="environment"><span></span> DEMO ENVIRONMENT</span><label class="global-search" title="Search this page"><span>⌕</span><input id="globalSearch" type="search" placeholder="Search this page…" aria-label="Search this page"></label>{% if can_access('invoices') %}<button class="icon-btn notification" title="Open invoice notifications" onclick="window.location.href='{{ url_for('invoices') }}'">♧<em></em></button>{% endif %}<a class="top-avatar" href="{{ url_for('profile') }}" title="Open profile">{{ current_user.full_name[:2]|upper }}</a></div>
+    </header>
+    <div class="page-content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}<div class="flash-stack">{% for category, message in messages %}<div class="flash {{ category }}"><span>{{ '✓' if category == 'success' else '!' }}</span>{{ message }}<button onclick="this.parentElement.remove()">×</button></div>{% endfor %}</div>{% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+      <footer class="footer"><span>© 2026 UNIWORK · Built for resilient manufacturing</span><span><i class="status-dot"></i> Demo workspace <b>·</b> Verify GST master rates</span></footer>
+    </div>
+  </main>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body></html>

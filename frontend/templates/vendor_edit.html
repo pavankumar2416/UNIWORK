@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block content %}
+<div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> SUPPLIER NETWORK / MASTER DATA</div><h1>Edit vendor</h1><p class="subheading">Update the supplier record. Existing purchase orders and invoices keep their linked history.</p></div><div class="heading-actions"><a class="btn btn-quiet" href="{{ url_for('vendor_detail',vendor_id=vendor.id) }}">← Back to vendor</a></div></div>
+<section class="panel form-panel vendor-create-panel"><div class="panel-heading"><div><div class="section-kicker">VENDOR MASTER</div><h2>{{ vendor.name }}</h2><p>Changes are recorded in the audit trail.</p></div><span class="badge {{ 'badge-green' if vendor.active|int == 1 else 'badge-red' }}">{{ 'Active' if vendor.active|int == 1 else 'Inactive' }}</span></div>
+<form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+<label>Vendor code *<input name="code" value="{{ vendor.code }}" maxlength="30" required></label>
+<label>Vendor / company name *<input name="name" value="{{ vendor.name }}" maxlength="120" required></label>
+<label>GSTIN *<input name="gstin" value="{{ vendor.gstin }}" minlength="15" maxlength="15" required></label>
+<label>Registered state *<select name="state" required><option value="">Select state</option>{% for state in states %}<option value="{{ state }}" {{ 'selected' if vendor.state==state else '' }}>{{ state }}</option>{% endfor %}</select></label>
+<label>Email<input name="email" type="email" value="{{ vendor.email or '' }}" placeholder="accounts@vendor.example"></label>
+<label>Phone<input name="phone" type="tel" value="{{ vendor.phone or '' }}" placeholder="Contact number"></label>
+<label>Payment terms (days)<input name="payment_terms" type="number" min="0" max="365" value="{{ vendor.payment_terms }}" required></label>
+<label>Vendor status<select name="active"><option value="1" {{ 'selected' if vendor.active|int == 1 else '' }}>Active — can receive new POs</option><option value="0" {{ 'selected' if vendor.active|int == 0 else '' }}>Inactive — existing history preserved</option></select></label>
+<div class="form-actions span-2"><span>Inactive suppliers are hidden from new PO creation but remain in reports and historical records.</span><button class="btn btn-primary" type="submit">Save vendor changes →</button></div>
+</form></section>{% endblock %}

@@ -1,0 +1,5 @@
+scenario,expected_behavior
+Invoice INV-0008,GST amount intentionally differs from the 18 percent demo assumption; review should flag it
+Invoice INV-0011,Taxable value intentionally differs from linked PO value; review should flag it
+Goods receipt,Receipt quantity above ordered balance should be rejected
+Inventory,Stock should be calculated from opening balances plus movements

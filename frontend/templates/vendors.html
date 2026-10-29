@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block content %}
+<div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> SUPPLIER NETWORK</div><h1>Vendor directory</h1><p class="subheading">Manage supplier master data and connect vendors to purchase orders and GST invoices.</p></div><div class="heading-actions"><a class="btn btn-quiet" href="{{ url_for('reports') }}">Vendor spend report ↗</a></div></div>
+<div class="vendor-summary"><div class="vendor-summary-icon">♧</div><div><b>{{ vendors|length }} supplier relationships</b><p>Vendor master records include GSTIN, registered state and payment terms.</p></div><span class="summary-chip">MASTER DATA</span></div>
+{% if current_user.role in ['admin','procurement'] %}
+<section class="panel form-panel vendor-create-panel"><div class="panel-heading"><div><h2>Add a vendor</h2><p>Required fields are marked by the browser before saving.</p></div><span class="badge badge-green">PROCUREMENT</span></div>
+<form method="post" action="{{ url_for('create_vendor') }}" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+<label>Vendor code *<input name="code" placeholder="VND-007" maxlength="30" required></label>
+<label>Vendor / company name *<input name="name" placeholder="Supplier legal name" maxlength="120" required></label>
+<label>GSTIN *<input name="gstin" placeholder="15-character GSTIN" minlength="15" maxlength="15" required></label>
+<label>Registered state *<select name="state" required><option value="">Select state</option>{% for state in ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'] %}<option>{{ state }}</option>{% endfor %}</select></label>
+<label>Email<input name="email" type="email" placeholder="accounts@vendor.example"></label>
+<label>Phone<input name="phone" type="tel" placeholder="Contact number"></label>
+<label>Payment terms (days)<input name="payment_terms" type="number" min="0" max="365" value="30" required></label>
+<div class="form-actions"><span>Vendor details are recorded in the audit trail.</span><button class="btn btn-primary" type="submit">＋ Add vendor</button></div>
+</form></section>
+{% endif %}
+<div class="vendor-list-toolbar"><div><h2>All vendors</h2><p class="muted">Search by vendor, code, GSTIN, state or email.</p></div><label class="search-box"><span>⌕</span><input id="vendorSearch" type="search" placeholder="Search vendors…" aria-label="Search vendors"></label></div>
+<section class="vendor-grid" id="vendorGrid">{% for v in vendors %}<a class="vendor-card vendor-card-link searchable-vendor" href="{{ url_for('vendor_detail', vendor_id=v.id) }}" aria-label="View details for {{ v.name }}"><div class="vendor-card-top"><div class="vendor-avatar avatar-{{ loop.index%5 }}">{{ v.name[:1] }}</div><span class="badge {{ 'badge-green' if v.active else 'badge-red' }}"><i></i>{{ 'Active' if v.active else 'Inactive' }}</span></div><h3>{{ v.name }}</h3><div class="vendor-code mono">{{ v.code }}</div><div class="vendor-details"><div><span>GSTIN</span><b class="mono">{{ v.gstin }}</b></div><div><span>REGISTERED STATE</span><b>{{ v.state }}</b></div><div><span>PAYMENT TERMS</span><b>Net {{ v.payment_terms }} days</b></div><div><span>PURCHASE ORDERS</span><b>{{ v.po_count }} linked</b></div></div><div class="vendor-card-footer"><span>✉ {{ v.email or 'No email provided' }}</span><span>↗</span></div></a>{% else %}<div class="empty-state">No vendors yet. Add your first vendor using the form above.</div>{% endfor %}</section>
+<div id="vendorNoResults" class="empty-state" hidden>No vendors match that search.</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+backend/.venv/
+backend/__pycache__/
+backend/tests/__pycache__/
+backend/instance/
+backend/.env
+.env
+*.py[cod]
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.db

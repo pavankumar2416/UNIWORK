@@ -1,0 +1,3 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ title }} · UNIWORK</title><link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}"></head>
+<body class="login-body"><main class="error-page"><div class="error-code">{{ code }}</div><h1>{{ message }}</h1><p>Nothing was changed by this request.</p>{% if current_user %}<a class="btn btn-primary" href="{{ url_for('dashboard') }}">Return to overview →</a>{% else %}<a class="btn btn-primary" href="{{ url_for('login') }}">Return to sign in →</a>{% endif %}</main></body></html>

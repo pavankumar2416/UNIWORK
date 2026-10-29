@@ -1,0 +1,3 @@
+supplier_gstin,invoice_number,taxable_value,igst_amount,cgst_amount,sgst_amount,invoice_date,eligibility
+29AABCM1001A1Z5,DEMO-GSTR2B-ONLY-001,25000.00,0.00,2250.00,2250.00,2026-10-04,Yes
+27AABCB2002B1Z6,DEMO-GSTR2B-VALUE-002,10000.00,1800.00,0.00,0.00,2026-10-11,Unknown

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-heading">
+  <div><div class="eyebrow"><span class="eyebrow-line"></span> OWNER VIEW / DISTRIBUTOR SETTLEMENT</div>
+    <h1>Accounts receivable</h1><p class="subheading">Track the money distributors owe, create line-level outward invoices, and prepare simulated GST payloads.</p></div>
+  <div class="heading-actions"><a class="btn btn-quiet" href="{{ url_for('export_csv',kind='receivables') }}">↧ Export AR CSV</a></div>
+</div>
+<div class="metrics-grid">
+  <article class="metric-card"><div class="metric-top"><span>OUTSTANDING RECEIVABLES</span><span class="metric-icon blue">₹</span></div><div class="metric-value">₹{{ "{:,.2f}".format(totals) }}</div><div class="metric-bottom"><span>Invoice totals less receipts</span></div></article>
+  <article class="metric-card"><div class="metric-top"><span>OPEN SALES INVOICES</span><span class="metric-icon mint">▤</span></div><div class="metric-value">{{ invoices|selectattr('outstanding','gt',0)|list|length }}</div><div class="metric-bottom"><span>Customer balances pending</span></div></article>
+  <article class="metric-card"><div class="metric-top"><span>OVERDUE INVOICES</span><span class="metric-icon red">!</span></div><div class="metric-value">{{ invoices|selectattr('overdue','equalto',1)|list|length }}</div><div class="metric-bottom"><span>Require follow-up</span></div></article>
+</div>
+<div class="notice-banner banner-amber"><div class="notice-symbol">!</div><div><b>GST simulation boundary.</b><span>Tax is calculated from the saved product GST rate and configured company/customer state. Confirm place-of-supply, HSN, exemption and statutory applicability with your tax adviser. Files are not submitted to GSTN/IRP.</span></div></div>
+
+<section class="panel form-panel">
+  <div class="panel-heading"><div><div class="section-kicker">OUTWARD BILLING</div><h2>Create sales invoice</h2><p>Add up to 20 distinct products and select the dispatch godown for each line. Available stock is checked and the stock ledger is reduced atomically with invoice creation.</p></div><span class="step-chip">SALES → GST → AR</span></div>
+  <form method="post" action="{{ url_for('create_sales_invoice') }}" class="form-grid" id="salesInvoiceForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+    <label>Customer / distributor *<select name="customer_id" id="salesCustomer" required>{% for c in customers %}<option value="{{ c.id }}" data-state="{{ c.state }}">{{ c.name }} · {{ c.state }}</option>{% endfor %}</select></label>
+    <label>Invoice number *<input name="invoice_number" maxlength="120" required placeholder="UNI-SI-2026-016"></label>
+    <label>Invoice date *<input name="invoice_date" type="date" value="{{ now_date }}" required></label>
+    <label>Due date <input name="due_date" type="date"><small class="field-hint">Blank uses the customer's payment terms.</small></label>
+    <div class="span-2">
+      <div class="table-scroll"><table class="line-editor-table"><thead><tr><th>PRODUCT / HSN</th><th>DISPATCH GODOWN</th><th>QUANTITY</th><th>UNIT PRICE (₹)</th><th>GST</th><th>LINE TOTAL</th><th></th></tr></thead><tbody id="salesLineRows"></tbody></table></div>
+      <template id="salesLineTemplate"><tr class="sales-line-row">
+        <td><select name="line_product_id" class="sales-product" required><option value="">Choose product</option>{% for p in products %}<option value="{{ p.id }}" data-rate="{{ p.gst_rate }}" data-hsn="{{ p.hsn }}" data-unit="{{ p.unit }}" data-default-price="{{ "%.2f"|format(p.unit_cost * 1.35) }}">{{ p.sku }} · {{ p.name }} · HSN {{ p.hsn }} · {{ p.gst_rate }}%</option>{% endfor %}</select><small class="cell-sub sales-hsn">HSN not selected</small></td>
+        <td><select name="line_warehouse_id" class="sales-warehouse" required><option value="">Choose godown</option>{% for w in warehouses %}<option value="{{ w.id }}">{{ w.code }} · {{ w.name }}</option>{% endfor %}</select></td>
+        <td><input name="line_quantity" class="sales-quantity" type="number" min="1" max="1000000" value="1" required></td>
+        <td><input name="line_unit_price" class="sales-price" type="number" min="0" max="1000000000" step="0.01" placeholder="0.00" required></td>
+        <td class="sales-rate">—</td><td class="amount sales-line-total">₹0.00</td><td><button type="button" class="btn btn-quiet btn-small remove-sales-line" aria-label="Remove invoice line">Remove</button></td>
+      </tr></template>
+      <div class="form-actions" style="margin-top:10px"><button type="button" class="btn btn-quiet" id="addSalesLine">＋ Add product line</button><span id="salesTaxMode">Choose a customer to preview tax split.</span></div>
+      <div class="inline-stats" style="margin-top:14px"><div><span>TAXABLE VALUE</span><b id="salesTaxablePreview">₹0.00</b></div><div><span>ESTIMATED GST</span><b id="salesGSTPreview">₹0.00</b></div><div><span>ESTIMATED INVOICE TOTAL</span><b id="salesTotalPreview">₹0.00</b></div></div>
+    </div>
+    <label class="span-2">Notes <input name="notes" maxlength="1000" placeholder="Dispatch reference, customer order number, etc."></label>
+    <div class="form-actions span-2"><span>Product HSN, unit and GST rate are snapshotted on each saved line.</span><button class="btn btn-primary" type="submit">Create sales invoice →</button></div>
+  </form>
+</section>
+
+<section class="panel table-panel"><div class="panel-heading"><div><div class="section-kicker">CUSTOMER BALANCES</div><h2>Sales invoice register</h2></div><div class="search-box"><span>⌕</span><input data-table-search="receivablesTable" placeholder="Search invoice, customer or GSTIN…"></div></div>
+  <div class="table-scroll"><table id="receivablesTable"><thead><tr><th>INVOICE</th><th>CUSTOMER</th><th>DATE / DUE</th><th>LINES</th><th>TAXABLE</th><th>GST</th><th>TOTAL</th><th>PAID</th><th>OUTSTANDING</th><th>STATUS</th><th>EXPORT</th></tr></thead><tbody>
+  {% for i in invoices %}<tr><td><b class="mono">{{ i.invoice_number }}</b><small class="cell-sub">{{ i.status }}</small></td><td>{{ i.customer_name }}<small class="cell-sub mono">{{ i.gstin }}</small><small class="cell-sub">{{ i.state }}</small></td><td>{{ i.invoice_date }}<small class="cell-sub {{ 'text-amber' if i.overdue else '' }}">Due {{ i.due_date }}{% if i.overdue %} · OVERDUE{% endif %}</small></td><td>{{ i.line_count }}</td><td class="amount">₹{{ "{:,.2f}".format(i.taxable_value) }}</td><td class="amount">₹{{ "{:,.2f}".format(i.gst_amount) }}<small class="cell-sub">IGST ₹{{ "{:,.2f}".format(i.igst_amount) }} · CGST ₹{{ "{:,.2f}".format(i.cgst_amount) }} · SGST ₹{{ "{:,.2f}".format(i.sgst_amount) }}</small></td><td class="amount"><b>₹{{ "{:,.2f}".format(i.total_amount) }}</b></td><td class="amount">₹{{ "{:,.2f}".format(i.paid_amount) }}</td><td class="amount"><b>₹{{ "{:,.2f}".format(i.outstanding) }}</b></td><td><span class="badge {{ 'badge-green' if i.status=='Paid' else 'badge-amber' }}">{{ i.status }}</span></td><td>{% if i.line_count %}<a class="btn btn-quiet btn-small" href="{{ url_for('gst_export',kind='einvoice',invoice_id=i.id) }}">INV-01 JSON</a><a class="btn btn-quiet btn-small" href="{{ url_for('gst_export',kind='ewaybill',invoice_id=i.id) }}">EWB JSON</a>{% else %}<small class="cell-sub">Legacy summary: add a new line-level invoice for export.</small>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="11" class="empty-cell">No customer invoices yet.</td></tr>{% endfor %}</tbody></table></div><div class="table-footer"><span>GST JSON files are simulated payloads only; use GST_SCHEMA_ASSUMPTIONS.md before evaluating format compliance.</span><span>{{ invoices|length }} invoices</span></div>
+</section>
+
+<section class="panel form-panel"><div class="panel-heading"><div><div class="section-kicker">TRANSPORT DETAILS</div><h2>Prepare e-way-bill information</h2><p>Save transport data against a line-level outward invoice. Required fields depend on transport mode and legal applicability.</p></div><span class="step-chip">INVOICE → TRANSPORT</span></div>
+  <form method="post" action="{{ url_for('save_transport_details') }}" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+    <label>Sales invoice *<select name="invoice_id" required><option value="">Choose invoice</option>{% for i in transport_invoices %}<option value="{{ i.id }}">{{ i.invoice_number }} · {{ i.customer_name }}</option>{% endfor %}</select></label>
+    <label>Transport mode *<select name="trans_mode" id="transportMode"><option value="1">Road</option><option value="2">Rail</option><option value="3">Air</option><option value="4">Ship</option></select></label>
+    <label>Distance (km) *<input name="trans_distance" type="number" min="0" max="9999" value="0" required></label>
+    <label>Vehicle registration <input name="vehicle_no" placeholder="KA09AB1234" maxlength="20"><small class="field-hint">Required for road mode.</small></label>
+    <label>Vehicle type *<select name="vehicle_type"><option value="R">Regular vehicle</option><option value="O">Over-dimensional cargo</option></select></label>
+    <label>Transporter GSTIN <input name="transporter_id" maxlength="15" placeholder="Optional transporter GSTIN"></label>
+    <label>Transporter name <input name="transporter_name" maxlength="100"></label>
+    <label>Transport document number <input name="transport_doc_no" maxlength="50"><small class="field-hint">Required with document date for rail/air/ship.</small></label>
+    <label>Transport document date <input name="transport_doc_date" type="date"></label>
+    <div class="form-actions span-2"><span>Payloads are downloads only and are not sent to GSTN.</span><button class="btn btn-primary" type="submit">Save transport details →</button></div>
+  </form>
+</section>
+
+<section class="panel form-panel"><div class="panel-heading"><div><div class="section-kicker">CASH APPLICATION</div><h2>Record customer receipt</h2><p>Applies cash received against one invoice; overpayments are blocked.</p></div></div>
+<form method="post" action="{{ url_for('record_customer_payment') }}" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token_value }}"><label>Invoice with balance *<select name="invoice_id" required><option value="">Select invoice</option>{% for i in payment_invoices %}<option value="{{ i.id }}">{{ i.invoice_number }} · {{ i.customer_name }} · outstanding ₹{{ "{:,.2f}".format(i.outstanding) }}</option>{% endfor %}</select></label><label>Receipt amount (₹) *<input name="amount" type="number" min="0.01" step="0.01" required></label><label>Receipt date *<input name="payment_date" type="date" value="{{ now_date }}" required></label><label>Bank / UTR reference *<input name="reference" maxlength="120" required></label><label class="span-2">Notes <input name="notes" maxlength="500"></label><div class="form-actions span-2"><span>Receipt cannot exceed the outstanding balance.</span><button class="btn btn-primary" type="submit">Record receipt →</button></div></form></section>
+
+<section class="panel table-panel"><div class="panel-heading"><div><div class="section-kicker">RECEIPTS HISTORY</div><h2>Recent customer receipts</h2></div></div><div class="table-scroll"><table><thead><tr><th>DATE</th><th>INVOICE</th><th>CUSTOMER</th><th>AMOUNT</th><th>REFERENCE</th><th>RECORDED BY</th></tr></thead><tbody>{% for p in payments %}<tr><td>{{ p.payment_date }}</td><td class="mono">{{ p.invoice_number }}</td><td>{{ p.customer_name }}</td><td class="amount">₹{{ "{:,.2f}".format(p.amount) }}</td><td class="mono">{{ p.reference }}</td><td>{{ p.created_by }}</td></tr>{% else %}<tr><td colspan="6" class="empty-cell">No customer receipts recorded.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const form = document.getElementById('salesInvoiceForm');
+  if (!form) return;
+  const rows = document.getElementById('salesLineRows');
+  const template = document.getElementById('salesLineTemplate');
+  const companyState = {{ company_state|tojson }}.trim().toLowerCase();
+  const customerSelect = document.getElementById('salesCustomer');
+  const money = n => '₹' + (Number.isFinite(n) ? n : 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  function recalc() {
+    const customerState = (customerSelect.selectedOptions[0]?.dataset.state || '').trim().toLowerCase();
+    const intrastate = customerState === companyState;
+    let taxable = 0, tax = 0, total = 0;
+    rows.querySelectorAll('.sales-line-row').forEach(row => {
+      const select = row.querySelector('.sales-product');
+      const option = select.selectedOptions[0];
+      const qty = Math.max(0, Number(row.querySelector('.sales-quantity').value) || 0);
+      const price = Math.max(0, Number(row.querySelector('.sales-price').value) || 0);
+      const rate = Number(option?.dataset.rate || 0);
+      const lineTaxable = qty * price;
+      const lineTax = lineTaxable * rate / 100;
+      const lineTotal = lineTaxable + lineTax;
+      taxable += lineTaxable; tax += lineTax; total += lineTotal;
+      row.querySelector('.sales-rate').textContent = option?.value ? `${rate}% ${intrastate ? '(C+S)' : '(I)'}` : '—';
+      row.querySelector('.sales-hsn').textContent = option?.value ? `HSN ${option.dataset.hsn} · ${option.dataset.unit}` : 'HSN not selected';
+      row.querySelector('.sales-line-total').textContent = money(lineTotal);
+    });
+    document.getElementById('salesTaxablePreview').textContent = money(taxable);
+    document.getElementById('salesGSTPreview').textContent = money(tax);
+    document.getElementById('salesTotalPreview').textContent = money(total);
+    document.getElementById('salesTaxMode').textContent = intrastate ? 'Same-state customer: CGST + SGST preview.' : 'Other-state customer: IGST preview.';
+  }
+  function addLine() {
+    if (rows.querySelectorAll('.sales-line-row').length >= 20) return;
+    const node = template.content.cloneNode(true);
+    const row = node.querySelector('.sales-line-row');
+    row.querySelector('.sales-product').addEventListener('change', e => {
+      const price = row.querySelector('.sales-price');
+      if (!price.value && e.target.selectedOptions[0]?.dataset.defaultPrice) price.value = e.target.selectedOptions[0].dataset.defaultPrice;
+      recalc();
+    });
+    row.querySelector('.sales-quantity').addEventListener('input', recalc);
+    row.querySelector('.sales-price').addEventListener('input', recalc);
+    row.querySelector('.remove-sales-line').addEventListener('click', () => {
+      if (rows.querySelectorAll('.sales-line-row').length > 1) row.remove();
+      recalc();
+    });
+    rows.appendChild(node); recalc();
+  }
+  document.getElementById('addSalesLine').addEventListener('click', addLine);
+  customerSelect.addEventListener('change', recalc);
+  addLine();
+})();
+</script>
+{% endblock %}

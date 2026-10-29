@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: uniwork-vendor-invoice-v5
+    runtime: python
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: pip install -r backend/requirements-production.txt
+    startCommand: cd backend && gunicorn --workers 1 --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: SHOW_DEMO_CREDENTIALS
+        value: "0"
+      - key: VENDOR_DATA_KEY
+        sync: false
